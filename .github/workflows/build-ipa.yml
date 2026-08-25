@@ -1,0 +1,48 @@
+name: Build PocketWin IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: Projekt entpacken
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/PocketWinSource"
+          unzip -q PocketWin-complete.zip -d "$RUNNER_TEMP/PocketWinSource"
+          echo "PROJECT_DIR=$RUNNER_TEMP/PocketWinSource/PocketWin" >> "$GITHUB_ENV"
+
+      - name: Xcode-Version anzeigen
+        run: xcodebuild -version
+
+      - name: Projekt prüfen
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: ./Scripts/validate_project.py
+
+      - name: Unsignierte IPA bauen
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          chmod +x Scripts/build_blink_ios.sh
+          chmod +x Scripts/build_unsigned_ipa.sh
+          ./Scripts/build_unsigned_ipa.sh
+
+      - name: IPA bereitstellen
+        uses: actions/upload-artifact@v4
+        with:
+          name: PocketWin-unsigned-IPA
+          path: ${{ env.PROJECT_DIR }}/Build/PocketWin-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
